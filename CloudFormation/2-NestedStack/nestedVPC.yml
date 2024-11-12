@@ -1,0 +1,63 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+Parameters:
+  EnvType:
+    Type: String
+    Default: "dev"
+    AllowedValues:
+      - 'dev'
+      - 'prod'
+
+Resources:
+  MyVPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.16.0.0/16
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: "Environment"
+          Value: !If [IsProd, "Production", "Developement"]
+  MyInternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: "Environment"
+          Value: !If [IsProd, "Production", "Development"]
+  MyIgwAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref MyInternetGateway
+      VpcId: !Ref MyVPC
+  PublicSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref MyVPC
+      AvailabilityZone: !Select [0, !GetAZs '']
+      CidrBlock: !Select [0, !Cidr [ 10.16.0.0/16, 2, 8 ]]
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: Public Subnet (AZ1) of MyVPC
+  PrivateSubnet1: 
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref MyVPC
+      AvailabilityZone: !Select [0, !GetAZs '']
+      CidrBlock: !Select [1, !Cidr [ 10.16.0.0/16, 2, 8 ]]
+      MapPublicIpOnLaunch: false
+      Tags: 
+        - Key: Name 
+          Value: Private Subnet (AZ1) of MyVPC
+
+Conditions:
+  IsProd: !Equals [!Ref EnvType, "prod"]
+
+Outputs:
+  PublicSubnet1ID: 
+    Description: PublicSubnet 1 ID
+    Value: !Ref PublicSubnet1
+  PrivateSubnet1ID: 
+    Description: PrivateSubnet 1 ID
+    Value: !Ref PrivateSubnet1
+  

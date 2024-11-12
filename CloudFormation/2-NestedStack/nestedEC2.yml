@@ -1,0 +1,39 @@
+Parameters:
+  MyEC2InstanceType:
+    Type: String
+    Description: Available EC2 Instance Type
+    Default: "t2.micro"
+    AllowedValues: 
+      - t2.micro
+      - t3.micro
+  LastestAmiId: 
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Description: "AMI for EC2"
+    Default: "/aws/service/ami-amazon-linux-latest/amzn-ami-hvm-x86_64-gp2"
+  EnvType:
+    Type: String
+    Default: "dev"
+    AllowedValues:
+      - 'dev'
+      - 'prod'
+  SubnetID:
+    Type: String
+
+Resources:
+  MyEC2Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: !Ref MyEC2InstanceType
+      ImageId: !Ref LastestAmiId
+      SubnetId: !Ref SubnetID
+      Tags:
+        - Key: "Environment"
+          Value: !If [IsProd, "Production", "Development"]
+ 
+Conditions:
+  IsProd: !Equals [!Ref EnvType, "prod"]
+
+Outputs:
+  MyEC2PublicIP:
+    Description: Public Address of EC2 instance
+    Value: !GetAtt MyEC2Instance.PublicIp

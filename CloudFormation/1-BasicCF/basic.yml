@@ -1,0 +1,65 @@
+Mappings:
+  RegionMap:
+    us-east-1:
+      Tag: "us-east-1-tag"
+    us-west-1:
+      Tag: "us-west-1-tag"
+
+Parameters:
+  MyEC2InstanceType:
+    Type: String
+    Description: Available EC2 Instance Type
+    Default: "t2.micro"
+    AllowedValues: 
+      - t2.micro
+      - t3.micro
+  LastestAmiId: 
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Description: "AMI for EC2"
+    Default: "/aws/service/ami-amazon-linux-latest/amzn-ami-hvm-x86_64-gp2" # More Information: https://docs.aws.amazon.com/systems-manager/latest/userguide/parameter-store-public-parameters.html
+  EnvType:
+    Type: String
+    Default: "dev"
+    AllowedValues:
+      - 'dev'
+      - 'prod'
+
+Resources:
+  MyVPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.16.0.0/16
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: "Environment"
+          Value: !If [IsProd, "Production", "Developement"]
+  MyInternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: "Environment"
+          Value: !If [IsProd, "Production", "Development"]
+  MyIgwAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref MyInternetGateway
+      VpcId: !Ref MyVPC
+      
+  MyEC2Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: !Ref MyEC2InstanceType
+      ImageId: !Ref LastestAmiId
+      Tags:
+        - Key: "Environment"
+          Value: !If [IsProd, "Production", "Development"]
+
+Conditions:
+  IsProd: !Equals [!Ref EnvType, "prod"]
+
+Outputs:
+  MyEC2PublicIP:
+    Description: Public Address of EC2 instance
+    Value: !GetAtt MyEC2Instance.PublicIp
+
