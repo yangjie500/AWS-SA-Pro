@@ -1,0 +1,75 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Resources:
+  AllowCFNConsoleAccess:
+    Type: "AWS::IAM::Policy"
+    Properties:
+      PolicyName: "AllowCFNConsoleAccessAndAllowPassServiceRole"
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Action:
+              - "s3:CreateBucket"
+              - "s3:PutObject"
+              - "s3:ListBucket"
+              - "s3:GetObject"
+              - "s3:DeleteBucket"
+            Resource:
+              - "arn:aws:s3:::*"
+              - "arn:aws:s3:::*/*"
+          - Effect: "Allow"
+            Action: "cloudformation:CreateUploadBucket"
+            Resource: "*"
+          - Effect: "Allow"
+            Action:
+              - "iam:GetRole"
+              - "iam:PassRole"
+            Resource: "arn:aws:iam::061051259053:role/CFN-AllowCreationVPC" #Replace with Service Role ARN
+      Users:
+        - admin # Replace with the name of the existing user
+
+
+  AttachAWSCloudFormationFullAccessPolicy:
+    Type: "AWS::IAM::ManagedPolicy"
+    Properties:
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Action: 
+              - "cloudformation:*"
+            Resource:
+              - "*"
+      Users: 
+        - admin
+
+  CFNAllowCreationVPC:
+    Type: "AWS::IAM::Role"
+    Properties:
+      RoleName: "CFN-AllowCreationVPC"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: ""
+            Effect: "Allow"
+            Principal:
+              Service: "cloudformation.amazonaws.com"
+            Action: "sts:AssumeRole"
+      Policies:
+        - PolicyName: "VPCCreationPolicy"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: "Allow"
+                Action:
+                  - "ec2:CreateVpc"
+                  - "ec2:CreateTags"
+                  - "ec2:DescribeVpcs"
+                  - "ec2:ModifyVpcAttribute"
+                  - "ec2:DeleteVpc"
+                  - "ec2:CreateSubnet"
+                  - "ec2:DeleteSubnet"
+                  - "ec2:DescribeSubnets"
+                Resource: "*"
+
+      

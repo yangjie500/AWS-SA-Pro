@@ -1,0 +1,71 @@
+AWSTemplateFormatVersion : "2010-09-09"
+Description : "AWS CloudFormation Sample Template VPC_with_PublicIPs_And_DNS: Sample template that creates a VPC with DNS and public IPs enabled. Note that you are billed for the AWS resources that you use when you create a stack from this template."
+Resources:
+  MyVPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.16.0.0/16
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+  MyPublicSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref MyVPC
+      CidrBlock: "10.16.0.0/24"
+  MyInternetGateway: 
+    Type: AWS::EC2::InternetGateway
+  MyIgwAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref MyInternetGateway
+      VpcId: !Ref MyVPC
+
+  MyPublicRouteTable: 
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref MyVPC
+  MyPublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: MyIgwAttachment
+    Properties:
+      RouteTableId: !Ref MyPublicRouteTable
+      DestinationCidrBlock: "0.0.0.0/0"
+      GatewayId: !Ref MyInternetGateway
+  MyPublicSubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref MyPublicSubnet
+      RouteTableId: !Ref MyPublicRouteTable
+  MyPublicSubnetNetworkAclAssociation:
+    Type: AWS::EC2::SubnetNetworkAclAssociation
+    Properties:
+      SubnetId: !Ref MyPublicSubnet
+      NetworkAclId: !GetAtt MyVPC.DefaultNetworkAcl
+
+  MyWebServerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: "Enable HTTP Ingress"
+      VpcId: !Ref MyVPC 
+      SecurityGroupIngress: 
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+
+Outputs:
+  MyVPCId:
+    Description: "VPC ID"
+    Value: !Ref MyVPC
+    Export: 
+      Name: !Sub "${AWS::StackName}-VPCID" # Pseudo parameters
+  PublicSubNet:
+    Description: "The subnet ID to use for public web servers"
+    Value: !Ref MyPublicSubnet
+    Export: 
+      Name: !Sub "${AWS::StackName}-SubnetID"
+  WebServerSecurityGroup:
+    Description: "The security group ID to use for public web servers"
+    Value: !GetAtt MyWebServerSecurityGroup.GroupId
+    Export:
+      Name: !Sub "${AWS::StackName}-SecurityGroupID"

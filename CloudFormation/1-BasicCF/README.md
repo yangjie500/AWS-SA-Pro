@@ -143,7 +143,26 @@ Note that payload pass is accessible somewhere in the CloudFormation templates
 
 READ MORE in WaitCondition Documentation
 
+## Deletetion Policy
+Docs
+- https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-attribute-deletionpolicy.html
 
+With the DeletionPolicy attribute you can preserve or (in some cases) backup a resource when its stack is deleted. You specify a DeletionPolicy attribute for each resource that you want to control. If a resource has no DeletionPolicy attribute, AWS CloudFormation deletes the resource by default.
+
+- If you delete a logical resource from a template
+- BY DEFAULT, the physical resource is DELETED (Might cause data loss)
+- Three options, DELETE, RETAIN, SNAPSHOT
+- SNAPSHOT only works for EBS Volume, ElastiCache, Neptune, RDS, Redshift
+- Snapshots continue on past stack lifetime (Must clean up manually else incur $$$)
+- DELETION policy only works on Stack Deletion and not Stack REPLACE
+
+```yaml
+AWSTemplateFormatVersion: '2010-09-09'
+Resources:
+  MyBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+```
 
 
 
