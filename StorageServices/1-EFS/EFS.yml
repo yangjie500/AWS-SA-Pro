@@ -1,0 +1,281 @@
+Description:  Animals4Life base VPC Template + TWO EC2 Instance for EFS Demo
+Parameters:
+  LatestAmiId:
+    Description: AMI for Wordpess Instance (default is latest AmaLinux2023)
+    Type: 'AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>'
+    Default: '/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64'
+Resources:
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.16.0.0/16
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: a4l-vpc1
+  InternetGateway:
+    Type: 'AWS::EC2::InternetGateway'
+    Properties:
+      Tags:
+        - Key: Name
+          Value: A4L-vpc1-igw
+  InternetGatewayAttachment:
+    Type: 'AWS::EC2::VPCGatewayAttachment'
+    Properties:
+      VpcId: !Ref VPC
+      InternetGatewayId: !Ref InternetGateway
+  RouteTableWeb: 
+    Type: 'AWS::EC2::RouteTable'
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: A4L-vpc1-rt-web
+  RouteTableWebDefaultIPv4: 
+    Type: 'AWS::EC2::Route'
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      RouteTableId:
+        Ref: RouteTableWeb
+      DestinationCidrBlock: '0.0.0.0/0'
+      GatewayId:
+        Ref: InternetGateway
+  RouteTableAssociationWebA:
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    Properties:
+      SubnetId: !Ref SubnetWEBA
+      RouteTableId:
+        Ref: RouteTableWeb
+  RouteTableAssociationWebB:
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    Properties:
+      SubnetId: !Ref SubnetWEBB
+      RouteTableId:
+        Ref: RouteTableWeb
+  RouteTableAssociationWebC:
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    Properties:
+      SubnetId: !Ref SubnetWEBC
+      RouteTableId:
+        Ref: RouteTableWeb
+
+  SubnetWEBA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 0, !GetAZs '' ]
+      CidrBlock: 10.16.48.0/20
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: sn-web-A
+  SubnetWEBB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 1, !GetAZs '' ]
+      CidrBlock: 10.16.112.0/20
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: sn-web-B
+  SubnetWEBC:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 2, !GetAZs '' ]
+      CidrBlock: 10.16.176.0/20
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: sn-web-C
+
+  
+  InstanceRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+              - ec2.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Path: /
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/AmazonElasticFileSystemClientFullAccess"
+        - "arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy"
+        - "arn:aws:iam::aws:policy/AmazonSSMFullAccess"
+  InstanceProfile:
+    Type: 'AWS::IAM::InstanceProfile'
+    Properties:
+      Path: /
+      Roles:
+        - !Ref InstanceRole
+  InstanceSecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      VpcId: !Ref VPC
+      GroupDescription: Enable SSH access via port 22 IPv4 & v6
+      SecurityGroupIngress:
+        - Description: 'Allow SSH IPv4 IN'
+          IpProtocol: tcp
+          FromPort: '22'
+          ToPort: '22'
+          CidrIp: '0.0.0.0/0'
+        - Description: 'Allow HTTP IPv4 IN'
+          IpProtocol: tcp
+          FromPort: '80'
+          ToPort: '80'
+          CidrIp: '0.0.0.0/0'
+        - Description: 'Allow SSH IPv6 IN'
+          IpProtocol: tcp
+          FromPort: '22'
+          ToPort: '22'
+          CidrIpv6: ::/0
+  InstanceSecurityGroupSelfReferenceRule:
+    Type: "AWS::EC2::SecurityGroupIngress"
+    Properties:
+      GroupId: !Ref InstanceSecurityGroup
+      IpProtocol: 'tcp'
+      FromPort: '0'
+      ToPort: '65535'
+      SourceSecurityGroupId: !Ref InstanceSecurityGroup
+
+  ### AWS EFS ####
+  EFS:
+    Type: "AWS::EFS::FileSystem"
+    Properties: 
+      PerformanceMode: "generalPurpose"
+      ThroughputMode: "bursting"
+      Encrypted: false
+      BackupPolicy: 
+        Status: "DISABLED"
+      LifecyclePolicies:
+        - TransitionToIA: "AFTER_30_DAYS"
+        - TransitionToPrimaryStorageClass: "AFTER_1_ACCESS"
+  
+  EFSMountTargetA:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId: !Ref EFS
+      SubnetId: !Ref SubnetWEBA
+      SecurityGroups: 
+        - !Ref InstanceSecurityGroup
+  EFSMountTargetB:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId: !Ref EFS
+      SubnetId: !Ref SubnetWEBB
+      SecurityGroups: 
+        - !Ref InstanceSecurityGroup
+  EFSMountTargetC:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId: !Ref EFS
+      SubnetId: !Ref SubnetWEBC
+      SecurityGroups: 
+        - !Ref InstanceSecurityGroup
+
+    ### AWS EFS Access Point ###
+  AccessPointResource:
+    Type: AWS::EFS::AccessPoint
+    Properties:
+      FileSystemId: !Ref EFS
+      PosixUser:
+        Uid: "1322"
+        Gid: "1322"
+        SecondaryGids:
+          - "1344"
+          - "1452"
+      RootDirectory:
+        CreationInfo:
+          OwnerGid: "1322"
+          OwnerUid: "1322"
+          Permissions: "0755"
+        Path: "/testcfn/abc"
+
+  ### AWS EC2 ###
+  EC2InstanceA:
+    Type: AWS::EC2::Instance
+    CreationPolicy:
+      ResourceSignal:
+        Timeout: PT15M
+    Properties:
+      InstanceType: "t2.micro"
+      ImageId: !Ref LatestAmiId
+      IamInstanceProfile: !Ref InstanceProfile
+      SubnetId: !Ref SubnetWEBA
+      SecurityGroupIds: 
+        - !Ref InstanceSecurityGroup
+      Tags:
+        - Key: Name
+          Value: A4L-EFSInstanceA
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash -xe
+
+          # STEP 2 - Install system software
+          dnf -y install wget cowsay
+          # STEP 3 - COWSAY
+          echo "#!/bin/sh" > /etc/update-motd.d/40-cow
+          echo 'cowsay "Amazon Linux 2023 AMI - Animals4Life"' >> /etc/update-motd.d/40-cow
+          chmod 755 /etc/update-motd.d/40-cow
+          update-motd
+
+          # STEP 4 - Mounting of EFS
+
+          EFS_FILE_SYSTEM_ID="${EFS}"
+          MOUNT_POINT="/efs/wp-content"
+
+          sudo mkdir -p $MOUNT_POINT
+          sudo dnf -y install amazon-efs-utils
+          echo "$EFS_FILE_SYSTEM_ID:/ $MOUNT_POINT efs _netdev,tls,iam 0 0" | sudo tee -a /etc/fstab
+          sudo mount $MOUNT_POINT
+
+          # STEP 4 SIGNAL FINISH OF INSTALL & CONFIG
+          /opt/aws/bin/cfn-signal -e $? --stack ${AWS::StackId} --resource EC2InstanceA --region ${AWS::Region}
+
+  # EC2InstanceB:
+  #   Type: AWS::EC2::Instance
+  #   CreationPolicy:
+  #     ResourceSignal:
+  #       Timeout: PT15M
+  #   Properties:
+  #     InstanceType: "t2.micro"
+  #     ImageId: !Ref LatestAmiId
+  #     IamInstanceProfile: !Ref InstanceProfile
+  #     SubnetId: !Ref SubnetWEBA
+  #     SecurityGroupIds: 
+  #       - !Ref InstanceSecurityGroup
+  #     Tags:
+  #       - Key: Name
+  #         Value: A4L-EFSInstanceB
+  #     UserData:
+  #       Fn::Base64: !Sub |
+  #         #!/bin/bash -xe
+
+  #         # STEP 2 - Install system software
+  #         dnf -y install wget cowsay
+  #         # STEP 3 - COWSAY
+  #         echo "#!/bin/sh" > /etc/update-motd.d/40-cow
+  #         echo 'cowsay "Amazon Linux 2023 AMI - Animals4Life"' >> /etc/update-motd.d/40-cow
+  #         chmod 755 /etc/update-motd.d/40-cow
+  #         update-motd
+
+  #         # STEP 4 - Mounting of EFS
+
+  #         EFS_FILE_SYSTEM_ID="${EFS}"
+  #         MOUNT_POINT="/efs/wp-content"
+
+  #         sudo mkdir -p $MOUNT_POINT
+  #         sudo dnf -y install amazon-efs-utils
+  #         echo "$EFS_FILE_SYSTEM_ID:/ $MOUNT_POINT efs _netdev,tls,iam 0 0" | sudo tee -a /etc/fstab
+  #         sudo mount $MOUNT_POINT
+
+  #         # STEP 4 SIGNAL FINISH OF INSTALL & CONFIG
+  #         /opt/aws/bin/cfn-signal -e $? --stack ${AWS::StackId} --resource EC2InstanceB --region ${AWS::Region}
+

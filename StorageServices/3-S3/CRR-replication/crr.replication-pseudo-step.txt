@@ -1,0 +1,20 @@
+S3 bucket
+	- Allow Static Website Hosting (Not Neccesary if not Static Hosting)
+		- index.html
+	- Permission (Not Neccesary if not Static Hosting)
+		- Disable Block all public access
+	- Bucket Policy
+		- Refer to file
+	- Enable Versioning
+	- Replication Rule
+		- IAM Rules
+		
+
+S3 Bucket (Destination)
+	- Allow Static Website Hosting (Not Neccesary if not Static Hosting)
+		- index.html
+	- Permission (Not Neccesary if not Static Hosting)
+		- Disable Block all public access
+	- Bucket Policy
+		- Refer to file
+	- Enable Versioning

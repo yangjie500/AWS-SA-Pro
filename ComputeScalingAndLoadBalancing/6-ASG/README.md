@@ -6,7 +6,7 @@
 - Scaling Polcies automate based on metrics (Eg. CPU Load)
 - Will try to even out the instances in subnets that is configured to ASG (Eg. 3 Subnets, 3 Instances -> Probable that each subnet will have one instance)
 - Does Health Check (By default is the EC2 status check), If EC2 status check failed, ASG will remove the instance and launch another one (Self-Healing)
-
+- Can be used in multiple VPC
 
 ## ASG (Scaling Policies)
 - Manual Scaling - Manually adjust the desired capacity
