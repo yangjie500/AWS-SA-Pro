@@ -198,3 +198,46 @@ Two main types of Encryption
     - In order to encrypt or decrypt objects, a person needs to have permission to use the KMS key
     - By using multiple KMS key to encrypt objects, Role Separation can then be achieved
 
+## S3 Bucket Keys
+docs: https://docs.aws.amazon.com/AmazonS3/latest/userguide/bucket-key.html
+Amazon S3 Bucket Keys reduce the cost of Amazon S3 server-side encryption using AWS Key Management Service (SSE-KMS). Bucket-level keys for SSE can reduce AWS KMS request costs by up to 99 percent by decreasing the request traffic from Amazon S3 to AWS KMS.
+- When KMS service is used for each object, each object will use a unique data encryption key (DEK)
+- Eg. When PutObject is called by a user, a call is made to KMS which uses KMS key to generate a data encryption key unique to this object
+- The data will be encrypted by this DEK, this ciphertext object and ciphertext DEK will be stored together (Single API call to KMS)
+- In other words, n objects uploaded = n api calls to KMS (Incurred high cost)
+- Calls to KMS have a cost & levels where throttling also occurs - 5,500 or 10,000 or 50,000 p/s across regions => using a single KMS key results in a scaling limit for PUTs per second per key
+- NOW instead of KMS key being used to generate each individual DEK, KMS now generate Time-Limited Bucket key used to generate DEKs within S3
+- This essentially offloads the work from KMS to S3 by reducing number of KMS API calls (reduces cost and increases scalability)
+- NOT Retroactive meaning, only affects objects and object encrpytion process after it's enabled on a bucket
+- Note:
+    - If you using Cloudtrails and enabled Bucket Keys, instead of showing object ARN, it will show bucket ARN
+    - Fewer cloudtrails events for KMS regarding S3 Encryption key
+    - Bucket keys also work with Same region replication and Cross region replication
+    - When used replication, S3 generally preserves the encryption settings of that encrypted object, so the encrypted object in the destination bucket generally uses the same settings as the encrypted object in the source bucket
+    - If replicating plaintext to a bucket using bucket keys, the object is encrypted at the destination side will also have its ETAG (object hash) changes
+
+## S3 PreSigned URLS
+Presigned URL's are a feature of S3 which allows the system to generate a URL with access permissions encoded into it, for a specific bucket and object, valid for a certain time period.
+- Assume S3 bucket has no public access (Default configuration), only user would have to authenticate to AWS and be authorised to access the resource
+- If you need to give random user access to the object, 3 common different methods which are not ideal
+    - Give random user an AWS identity (NOT IDEAL)
+    - Give random user an AWS credential (NOT IDEAL)
+    - Make the bucket public (NOT IDEAL)
+- AWS identity such as IAMadmin with some access right granted by permission policy, by providing security credential, specify which bucket and object and expiry date and time and how the object is accessed, he can request S3 to create a presigned URL
+- This url created by S3 will have encoded the details that IAM admin provided, which is which bucket and object its for etc... and more importantly that it is IAM admin user that generated it
+- This url can be used for both GET operations and PUT operations
+- Exam Note:
+    - Can create URL for an object you have no access to (STILL NO ACCESS)
+    - When using the URL, the permissions match the identity which generated it
+    - Access denied could mean the genrating ID never had access or doesn't have it now
+    - DON'T generate with a role, URL stops working when temporary credentials expire (Presigned url usually have longer expiry time than the temporary credentials)
+
+## S3 Select and Glacier Select
+S3 and Glacier Select allow you to use a SQL-Like statement to retrieve partial objects from S3 and Glacier.
+- S3 can store HUGE objects (up to 5TB) and infinite number objects
+- You often want to retrieve the entire object
+- By retrieving a 5 TB object.. it takes time and also uses 5TB of transfer
+- Filtering at the client side doesn't reduce this, you still uses 5TB of transfer
+- S3/Glacier select let you use SQL-Like statements to seletect PART of the object, pre-filtered by S3 and sent it to the client
+- CSV, JSON, Parquet, BZIP2 compression for CSV and JSON
+![](./S3-Glacier-Select.png)

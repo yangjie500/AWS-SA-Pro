@@ -1,0 +1,41 @@
+1- Create a bucket
+2- Upload an object
+3- Click on Open (Top right), Notice that you can access the content of the object 
+4- Note that in the URL, there is Amz-Security-Token provided by the console
+5- Click on the object URL and notice that you cannot access the content of the object
+6- There is no Amz-Security-Token to authenticate you
+7- To generate Pre-Signed URL, Click on Cloud Shell using the identity you are logged in and type in the following command to get the url
+```bash
+# s3://{bucketname}/{objectname} is the S3 Url and 180 is in seconds
+aws s3 presign s3://{bucketname}/{objectname} --expires-in 180
+```
+8- Paste the url into your browser 
+## END ##
+
+## Demostrate that 
+9- Generate another Pre-Signed URL but longer expiry time
+```bash
+aws s3 presign s3://{bucketname}/{objectname} --expires-in 3600
+```
+10- Enter IAM serivce and into Users
+11- Click the current user you are logged in to (IAM admin in my case)
+12- Add inline policy under permissions tabs
+13- Add the following json to prevent the current user to use S3 service
+```json
+{
+    "Version": "2012-10-17"
+    "Statement": [
+        "Sid": "Anything",
+        "Effect": "Deny",
+        "Action": "s3:*",
+        "Resource": "*"
+    ]
+}
+```
+14- Name the policy denyS3 and click on create policy
+15- Verify that you have lost access to S3 by typing this into the cloudshell, you should get ACCESSDENIED
+```bash
+aws s3 ls
+```
+16- Paste the pre-signed url that has the longer expiry time into the browser and see that you will not have the permission the view the object anymore
+17- This shows that by adjusting your permission of your user to lose access to S3 service, the presigned url will also have that deny S3 permissions 
