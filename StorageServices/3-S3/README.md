@@ -241,3 +241,13 @@ S3 and Glacier Select allow you to use a SQL-Like statement to retrieve partial 
 - S3/Glacier select let you use SQL-Like statements to seletect PART of the object, pre-filtered by S3 and sent it to the client
 - CSV, JSON, Parquet, BZIP2 compression for CSV and JSON
 ![](./S3-Glacier-Select.png)
+
+## S3 Access Point
+Amazon S3 Access Points, a feature of S3, simplifies managing data access at scale for applications using shared data sets on S3. Access points are unique hostnames that customers create to enforce distinct permissions and network controls for any request made through the access point.
+- Simplify managing access to S3 Buckets/Objects
+- Rather than 1 bucket w/ 1 Bucket Policy...
+- Creating many access points with each with different policies 
+- Each access point can be limited from where they can be access from (Different network access controls)
+- Each access point has its own endpoint address
+- Can be created via Console or aws s3control create-access-point --name secretcats --accountid 123456789012 --bucket catpics
+- Eg. A bucket that is storing sensitive 1.pet health information, 2.Staff information

@@ -1,0 +1,206 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Two VPC - Two Access Point - Two Objects Tag
+Parameters:
+  LatestAmiId:
+    Description: AMI for Instance
+    Type: "AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>"
+    Default: "/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2"
+Resources:
+  VPC1:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.16.0.0/16
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: vpc1
+  VPC2:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.17.0.0/16
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: vpc2
+  VPC1RT:
+    Type: "AWS::EC2::RouteTable"
+    Properties:
+      VpcId: !Ref VPC1
+      Tags:
+        - Key: Name
+          Value: vpc1rt
+
+  VPC2RT:
+    Type: "AWS::EC2::RouteTable"
+    Properties:
+      VpcId: !Ref VPC2
+      Tags:
+        - Key: Name
+          Value: vpc2rt
+
+  VPC1Subnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC1
+      AvailabilityZone: !Select [0, !GetAZs ""]
+      CidrBlock: 10.16.48.0/20
+      Tags:
+        - Key: Name
+          Value: VPC1Subnet
+
+  VPC2Subnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC2
+      AvailabilityZone: !Select [0, !GetAZs ""]
+      CidrBlock: 10.17.48.0/20
+      Tags:
+        - Key: Name
+          Value: VPC2Subnet
+
+  VPC1SubnetRTassociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref VPC1RT
+      SubnetId: !Ref VPC1Subnet
+
+  VPC2SubnetRTassociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref VPC2RT
+      SubnetId: !Ref VPC2Subnet
+
+  ##### S3 Gateway Endpoint #####
+  VPC1GWEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.s3"
+      VpcEndpointType: Gateway
+      VpcId: !Ref VPC1
+      RouteTableIds:
+        - !Ref VPC1RT
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: "*"
+            Action:
+              - "*"
+            Resource:
+              - "*"
+
+  VPC2GWEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.s3"
+      VpcEndpointType: Gateway
+      VpcId: !Ref VPC2
+      RouteTableIds:
+        - !Ref VPC2RT
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: "*"
+            Action:
+              - "*"
+            Resource:
+              - "*"
+
+  ##### Interface Endpoint #####
+  # SSM Interface Endpoint
+  SSMEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.ssm"
+      VpcEndpointType: Interface
+      VpcId: !Ref VPC1
+      SubnetIds:
+        - !Ref VPC1Subnet
+      SecurityGroupIds:
+        - !Ref VPC1S3AccessSecurityGroup
+      PrivateDnsEnabled: true
+
+  # SSM Messages Interface Endpoint
+  SSMMessagesEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.ssmmessages"
+      VpcEndpointType: Interface
+      VpcId: !Ref VPC1
+      SubnetIds:
+        - !Ref VPC1Subnet
+      SecurityGroupIds:
+        - !Ref VPC1S3AccessSecurityGroup
+      PrivateDnsEnabled: true
+
+  # EC2 Messages Interface Endpoint
+  EC2MessagesEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.ec2messages"
+      VpcEndpointType: Interface
+      VpcId: !Ref VPC1
+      SubnetIds:
+        - !Ref VPC1Subnet
+      SecurityGroupIds:
+        - !Ref VPC1S3AccessSecurityGroup
+      PrivateDnsEnabled: true
+
+  ##### S3 Bucket #####
+
+  S3Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: yang-test-bucket-123321
+
+  ##### EC2 #####
+  Vpc1Ec2Role:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Path: /
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+
+  Vpc1Ec2InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Path: /
+      Roles:
+        - !Ref Vpc1Ec2Role
+
+  # Vpc1Ec2Instance:
+  #   Type: AWS::EC2::Instance
+  #   Properties:
+  #     InstanceType: "t2.micro"
+  #     ImageId: !Ref LatestAmiId
+  #     IamInstanceProfile: !Ref Vpc1Ec2InstanceProfile
+  #     SubnetId: !Ref VPC1Subnet
+  #     SecurityGroupIds:
+  #       - !Ref VPC1S3AccessSecurityGroup
+
+  VPC1S3AccessSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security Group allowing EC2 access to S3 via VPC Endpoint
+      VpcId: !Ref VPC1
+      SecurityGroupIngress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0  # Allow all inbound traffic
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0  # Allow all outbound traffic
+      Tags:
+        - Key: Name
+          Value: VPC1S3AccessSecurityGroup
